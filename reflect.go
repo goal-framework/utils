@@ -54,24 +54,61 @@ func EachStructField(s interface{}, handler func(reflect.StructField, reflect.Va
 }
 
 // GetTypeKey 获取类型唯一字符串
-func GetTypeKey(p reflect.Type) string {
+func GetTypeKey(p reflect.Type) (key string) {
 	if p.Kind() == reflect.Ptr {
 		p = p.Elem()
+		key = "*"
 	}
 
 	pkgPath := p.PkgPath()
 
-	return IfString(pkgPath == "", "", pkgPath+".") + p.Name()
+	if pkgPath != "" {
+		key += pkgPath + "."
+	}
+
+	return key + p.Name()
+}
+// ContainsKind checks if a specified kind in the slice of kinds.
+func ContainsKind(kinds []reflect.Kind, kind reflect.Kind) bool {
+	for i := 0; i < len(kinds); i++ {
+		if kind == kinds[i] {
+			return true
+		}
+	}
+
+	return false
 }
 
-// NotNil 尽量不要 nil
-func NotNil(args ...interface{}) interface{} {
+// IsNil checks if a specified object is nil or not, without Failing.
+func IsNil(object interface{}) bool {
+	if object == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(object)
+	kind := value.Kind()
+	isNilableKind := ContainsKind(
+		[]reflect.Kind{
+			reflect.Chan, reflect.Func,
+			reflect.Interface, reflect.Map,
+			reflect.Ptr, reflect.Slice},
+		kind)
+
+	if isNilableKind && value.IsNil() {
+		return true
+	}
+
+	return false
+}
+
+// WithoutNil 尽量不要 nil
+func WithoutNil(args ...interface{}) interface{} {
 	for _, arg := range args {
 		switch argValue := arg.(type) {
 		case func() interface{}:
 			arg = argValue()
 		}
-		if arg != nil {
+		if !IsNil(arg) {
 			return arg
 		}
 	}
